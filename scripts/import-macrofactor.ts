@@ -91,13 +91,14 @@ function parseWorkbook(filePath: string): Row[] {
 
 async function ensureUser() {
   const passcode = process.env.SEED_PASSCODE ?? "1234";
-  const name = process.env.SEED_USER_NAME ?? "Me";
+  const name = process.env.SEED_USER_NAME ?? "Admin";
+  const username = (process.env.SEED_USERNAME ?? "admin").toLowerCase();
   const hash = await bcrypt.hash(passcode, 10);
 
   return prisma.user.upsert({
     where: { id: "seed-user" },
-    update: { name, passcodeHash: hash },
-    create: { id: "seed-user", name, passcodeHash: hash },
+    update: { name, username, passcodeHash: hash },
+    create: { id: "seed-user", name, username, passcodeHash: hash },
   });
 }
 

@@ -13,6 +13,7 @@
  */
 import { test, expect } from "@playwright/test";
 
+const PROD_USERNAME = process.env.PROD_USERNAME ?? "admin";
 const PROD_PASSCODE = process.env.PROD_PASSCODE ?? "1234";
 
 type WindowId = "1W" | "1M" | "3M" | "6M" | "1Y" | "All";
@@ -44,7 +45,8 @@ test.describe("Production (Vercel) MacroFactor KPI parity", () => {
 
   test("dashboard reports correct KPIs for every window", async ({ page }) => {
     await page.goto("/login");
-    await page.getByTestId("passcode-input").fill(PROD_PASSCODE);
+    await page.getByTestId("username-input").fill(PROD_USERNAME);
+    await page.getByTestId("password-input").fill(PROD_PASSCODE);
     await page.getByTestId("login-submit").click();
     await page.waitForURL("**/weight-trend");
 

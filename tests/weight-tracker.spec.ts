@@ -17,7 +17,8 @@ function runSeed(mode: "default" | "ewma" | "gap") {
 
 async function login(page: import("@playwright/test").Page) {
   await page.goto("/login");
-  await page.getByTestId("passcode-input").fill("1234");
+  await page.getByTestId("username-input").fill("admin");
+  await page.getByTestId("password-input").fill("1234");
   await page.getByTestId("login-submit").click();
   await page.waitForURL("**/weight-trend");
 }

@@ -8,15 +8,23 @@ import { createSession, clearSession } from "@/lib/session";
 export async function loginAction(
   formData: FormData,
 ): Promise<{ error: string } | void> {
-  const passcode = String(formData.get("passcode") ?? "");
-  const user = await prisma.user.findFirst();
-  if (!user) {
-    return { error: "No user configured. Run npm run db:seed." };
+  const username = String(formData.get("username") ?? "")
+    .trim()
+    .toLowerCase();
+  const password = String(formData.get("password") ?? "");
+
+  if (!username || !password) {
+    return { error: "Username and password are required." };
   }
 
-  const valid = await bcrypt.compare(passcode, user.passcodeHash);
+  const user = await prisma.user.findUnique({ where: { username } });
+  if (!user) {
+    return { error: "Invalid username or password." };
+  }
+
+  const valid = await bcrypt.compare(password, user.passcodeHash);
   if (!valid) {
-    return { error: "Invalid passcode." };
+    return { error: "Invalid username or password." };
   }
 
   await createSession(user.id);

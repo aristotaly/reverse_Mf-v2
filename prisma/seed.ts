@@ -11,16 +11,18 @@ const SAMPLE_WEIGHTS = [
 ];
 
 async function main() {
-  const name = process.env.SEED_USER_NAME ?? "Me";
+  const name = process.env.SEED_USER_NAME ?? "Admin";
+  const username = (process.env.SEED_USERNAME ?? "admin").toLowerCase();
   const passcode = process.env.SEED_PASSCODE ?? "1234";
   const hash = await bcrypt.hash(passcode, 10);
 
   const user = await prisma.user.upsert({
     where: { id: "seed-user" },
-    update: { name, passcodeHash: hash },
+    update: { name, username, passcodeHash: hash },
     create: {
       id: "seed-user",
       name,
+      username,
       passcodeHash: hash,
     },
   });

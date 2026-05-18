@@ -13,6 +13,7 @@ export const TEST_TODAY = new Date("2026-05-18T00:00:00.000Z");
 
 export async function seedTestUser(mode: SeedMode = "default") {
   const passcode = process.env.SEED_PASSCODE ?? "1234";
+  const username = (process.env.SEED_USERNAME ?? "admin").toLowerCase();
   const hash = await bcrypt.hash(passcode, 10);
 
   await prisma.weightEntry.deleteMany();
@@ -21,6 +22,7 @@ export async function seedTestUser(mode: SeedMode = "default") {
   const user = await prisma.user.create({
     data: {
       id: "test-user",
+      username,
       name: "Test",
       passcodeHash: hash,
     },

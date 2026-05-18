@@ -23,14 +23,27 @@ export function LoginForm() {
   return (
     <form action={handleSubmit} className="mt-6 space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="passcode">Passcode</Label>
+        <Label htmlFor="username">Username</Label>
         <Input
-          id="passcode"
-          name="passcode"
+          id="username"
+          name="username"
+          type="text"
+          required
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          data-testid="username-input"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="password">Password</Label>
+        <Input
+          id="password"
+          name="password"
           type="password"
           required
           autoComplete="current-password"
-          data-testid="passcode-input"
+          data-testid="password-input"
         />
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

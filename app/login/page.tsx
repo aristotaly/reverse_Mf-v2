@@ -8,7 +8,7 @@ export default function LoginPage() {
           Weight Trend
         </h1>
         <p className="mt-1 text-center text-sm text-neutral-500">
-          Enter your passcode to continue
+          Sign in with your username and password
         </p>
         <LoginForm />
       </div>
