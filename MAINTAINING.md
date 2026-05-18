@@ -26,6 +26,7 @@ A long-form companion to the [README](./README.md). Read this first if you need 
 16. [Known quirks and gotchas](#16-known-quirks-and-gotchas)
 17. [Conventions for AI assistants](#17-conventions-for-ai-assistants)
 18. [Progressive Web App (PWA)](#18-progressive-web-app-pwa)
+19. [Multi-user authorization & admin console (v2)](#19-multi-user-authorization--admin-console-v2)
 
 ---
 
@@ -861,3 +862,157 @@ To manually verify install on the live site:
 - **No push notifications.** The Next.js PWA guide includes a VAPID/web-push setup; we deliberately skipped it because there's nothing to notify about. If you ever add reminders ("you haven't logged in 3 days"), the recipe in `node_modules/next/dist/docs/01-app/02-guides/progressive-web-apps.md` is the starting point.
 - **No background sync.** Entries created while offline are not queued — the upsert Server Action will simply fail. If you need write-while-offline, store pending entries in IndexedDB and replay them on the next online tick using the Background Sync API.
 - **No app store distribution.** The PWA is install-only-from-browser. Wrapping it in Trusted Web Activity (Android Play Store) or PWABuilder is a future option.
+
+---
+
+## 19. Multi-user authorization & admin console (v2)
+
+v2 turns the app from "single passcode-gated user" into a real multi-user system, with a `role` column, an admin-only console, and self-protection invariants. Single-user deployments still work — the seed user is just one of many possible users now.
+
+### Authorization model
+
+Three concepts, in order of privilege:
+
+1. **Unauthenticated** — no session cookie. Can only reach `/login`, `/manifest.webmanifest`, `/sw.js`, `/offline.html`, and the icon files (everything else is bounced by `middleware.ts`).
+2. **Regular user** (`role = "user"`) — can use the dashboard, scale-weight entry, and trend logs. **Sees only their own `WeightEntry` rows** because every read/write is scoped by `getCurrentUser().id` (or `getSessionUserId()` in legacy callers).
+3. **Admin user** (`role = "admin"`) — everything a regular user can do, plus full access to `/admin` to create, promote/demote, reset passwords, and delete other users.
+
+The middleware enforces "must be logged in" only. Role enforcement lives in:
+
+- `app/admin/page.tsx` — server-side `redirect("/weight-trend")` if `me.role !== "admin"`.
+- `lib/actions/admin.ts` — every server action calls `requireAdmin()` first; on failure it returns `{ ok: false, error: "Forbidden." }` and the UI shows the error inline.
+
+### Why role isn't in the session cookie
+
+The session cookie payload is intentionally `{ userId }` only. Role is **always re-read from the database** in `getCurrentUser()`. This means demoting a user takes effect on their **next request** — not whenever their cookie happens to expire. The trade-off is a single Prisma round-trip per request to fetch the user row, which is negligible compared to the page's other queries.
+
+### Data model — the `role` column
+
+```prisma
+model User {
+  id            String   @id @default(uuid())
+  username      String   @unique
+  passcodeHash  String
+  name          String
+  role          String   @default("user")  // "admin" | "user"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  weightEntries WeightEntry[]
+}
+```
+
+The migration `prisma/migrations/20260518190000_add_user_role/migration.sql` adds the column idempotently (`ADD COLUMN IF NOT EXISTS`), backfills `'admin'` for the existing seed user, defaults everyone else to `'user'`, then locks in `NOT NULL` and `DEFAULT 'user'`.
+
+The same SQL is mirrored into `scripts/setup-prod-user.ts` so you can apply it manually to a Vercel Postgres instance that's out of sync with the migration history — useful for the same `P3018` recovery scenario described in §11.
+
+> **Stored as a free-form string, not a Prisma enum.** SQLite has no native enum support, and we want both schemas to behave identically. The single source of truth for valid values is the Zod schema in `lib/actions/admin.ts` (`z.enum(["admin", "user"])`).
+
+### Safety invariants enforced server-side
+
+All four invariants are enforced in `lib/actions/admin.ts`. Don't loosen them.
+
+| Invariant | Action | Error message |
+|-----------|--------|---------------|
+| Can't delete yourself | `deleteUserAction` | "You can't delete your own account." |
+| Can't delete the last admin | `deleteUserAction` | "Can't delete the last admin." |
+| Can't demote yourself | `setUserRoleAction` | "You can't demote yourself." |
+| Can't demote the last admin | `setUserRoleAction` | "Can't demote the last admin." |
+
+The UI also disables the buttons (`disabled={pending || isSelf}`) but that's belt-and-suspenders — server-side is the security boundary.
+
+### Files involved
+
+| File | Role |
+|------|------|
+| `prisma/schema.prisma`, `prisma/schema.sqlite.prisma` | `User.role` column |
+| `prisma/migrations/20260518190000_add_user_role/migration.sql` | Idempotent Postgres migration |
+| `lib/session.ts` | `getCurrentUser`, `requireUser`, `requireAdmin` helpers |
+| `lib/actions/admin.ts` | `listUsersAction`, `createUserAction`, `deleteUserAction`, `setUserRoleAction`, `setUserPasswordAction` |
+| `app/admin/page.tsx` | RSC, gated by `me.role === "admin"` |
+| `app/logout/route.ts` | Route handler that clears the cookie (cookies can't be deleted from a Page in App Router) |
+| `components/admin/admin-shell.tsx` | Client wrapper |
+| `components/admin/user-list.tsx` | User table with per-row reset/promote/delete |
+| `components/admin/create-user-dialog.tsx` | New-user form |
+| `components/weight-trend/weight-trend-shell.tsx` | Conditionally renders the **Manage users** link |
+| `tests/admin.spec.ts` | 6 end-to-end tests covering the full admin flow |
+| `scripts/setup-prod-user.ts` | Idempotently applies the role column + sets the production admin |
+
+### Server actions API
+
+```ts
+listUsersAction(): Promise<AdminUserSummary[]>
+createUserAction(formData): Promise<{ ok: boolean; error?: string }>
+deleteUserAction(userId): Promise<{ ok: boolean; error?: string }>
+setUserRoleAction(userId, role): Promise<{ ok: boolean; error?: string }>
+setUserPasswordAction(userId, newPassword): Promise<{ ok: boolean; error?: string }>
+```
+
+All five `require*` admin internally. All five `revalidatePath("/admin")` on success so the page re-renders fresh data.
+
+Validation rules (Zod):
+
+- **username** — lowercase, `[a-z0-9._-]+`, 3–32 chars, unique
+- **name** — 1–80 chars
+- **password** — 4–128 chars
+- **role** — `"admin" | "user"`
+
+### UI surface
+
+- **Header** — same as the rest of the app; "Add user" icon (UserPlus) opens the create dialog.
+- **Summary bar** — "{N} users · {M} admins".
+- **Per-row actions** (right side, three icons):
+  - 🔑 reset password — opens a dialog with a single password field
+  - 🛡️ toggle role — confirm dialog, swaps admin ↔ user (disabled on yourself)
+  - 🗑️ delete — confirm dialog warning that all entries cascade-delete (disabled on yourself)
+- **Inline error banner** at the top when an action fails (e.g. attempting a forbidden operation).
+
+### Common operations
+
+```powershell
+# Seed a fresh local dev DB with one admin (admin / 1234)
+npm run db:seed
+
+# Reset the production admin password (any Vercel deploy)
+$env:PROD_USERNAME = "admin"
+$env:PROD_PASSWORD = "new-password-here"
+$env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
+npx tsx scripts/setup-prod-user.ts
+
+# Create a user from the UI: login as admin → Manage users → Add (+) icon
+# Promote/demote: open the user row → tap the shield icon → confirm
+```
+
+### Testing
+
+```powershell
+npx playwright test tests/admin.spec.ts --reporter=list
+```
+
+The six tests cover:
+
+1. Admin sees "Manage users" link; non-admins don't
+2. Create user → new user can log in
+3. Reset password → user can log in with the new one
+4. Promote user → they get the admin link on next request
+5. Self-protection: admin can't delete/demote themselves (buttons disabled)
+6. Delete user (cascade removes their weight entries)
+
+### Migration from v1 (single-user) to v2 (multi-user)
+
+If you're upgrading a v1 Vercel deployment to v2:
+
+1. Pull v2 code and rebuild — `prisma migrate deploy` will run the new `add_user_role` migration on the next deploy. The migration is idempotent (`ADD COLUMN IF NOT EXISTS`).
+2. If the migration fails because the column was added manually, mark it as resolved: `npx prisma migrate resolve --schema=prisma/schema.prisma --applied 20260518190000_add_user_role`.
+3. Run `npx tsx scripts/setup-prod-user.ts` once to ensure the seed admin has `role = "admin"`.
+
+Existing weight entries are untouched. Existing user logins continue to work — the column defaults to `"user"`, and the seed admin is upgraded to `"admin"` by both the migration and the script.
+
+### Future extensions
+
+If you need finer-grained roles (e.g. coach/coachee where coaches see multiple users' data):
+
+1. Add a `Membership` join table: `userId`, `belongsToUserId`, `role` (e.g. `"owner" | "viewer"`).
+2. In the dashboard, accept an optional `?userId=` query param and scope reads accordingly after checking the membership table.
+3. The current `role` column on `User` becomes the "system role" (admin/user) — keep it as the global authorization layer.
+
+Avoid the temptation to encode coach/coachee using two roles in the `User.role` field. Membership is a relationship, not a personal attribute.

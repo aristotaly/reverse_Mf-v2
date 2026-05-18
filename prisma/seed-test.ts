@@ -24,6 +24,7 @@ export async function seedTestUser(mode: SeedMode = "default") {
       id: "test-user",
       username,
       name: "Test",
+      role: "admin",
       passcodeHash: hash,
     },
   });
@@ -119,11 +120,19 @@ export function expectedTrendForEwmaTest() {
   return byKey;
 }
 
-const mode = (process.argv[2] as SeedMode) ?? "default";
-seedTestUser(mode)
-  .then(() => prisma.$disconnect())
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+// Only auto-run when invoked directly as a CLI (e.g. `tsx prisma/seed-test.ts ewma`).
+// When this module is *imported* by a test, we must not eagerly hit the database —
+// the importing process won't have DATABASE_URL set.
+const invokedFile = (process.argv[1] ?? "").replace(/\\/g, "/");
+const isDirectCLI = invokedFile.endsWith("/prisma/seed-test.ts");
+
+if (isDirectCLI) {
+  const mode = (process.argv[2] as SeedMode) ?? "default";
+  seedTestUser(mode)
+    .then(() => prisma.$disconnect())
+    .catch(async (e) => {
+      console.error(e);
+      await prisma.$disconnect();
+      process.exit(1);
+    });
+}

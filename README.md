@@ -1,6 +1,6 @@
-# revers-mf — Weight Trend Tracker
+# reverse_Mf-v2 — Weight Trend Tracker (multi-user)
 
-A mobile-first weight tracking web app with EWMA trend analytics, built with Next.js, Prisma, and Tailwind CSS.
+A mobile-first weight tracking web app with EWMA trend analytics, built with Next.js, Prisma, and Tailwind CSS. This is the **v2** branch: it adds a real multi-user authorization model and an admin console on top of [revers-mf](https://github.com/aristotaly/revers-mf).
 
 > **Maintainers & contributors:** read [`MAINTAINING.md`](./MAINTAINING.md) for the long-form guide to architecture, the analytics math, deployment, and operations playbooks.
 
@@ -9,7 +9,8 @@ A mobile-first weight tracking web app with EWMA trend analytics, built with Nex
 - **Scale Weight** — log daily weight entries (kg)
 - **Weight Trend** — EWMA-smoothed trend line with interpolation for missing days
 - **Dashboard** — KPIs, Recharts chart, period filters, daily breakdown table
-- **Username + password auth** — lightweight single-user gate
+- **Multi-user auth** — username + password, each user sees only their own data
+- **Admin console** at `/admin` — create users, reset passwords, change roles, delete users, with self-protection (can't lock out the last admin)
 - **Installable PWA** — add to home screen on iOS/Android, install as a desktop app on Chrome/Edge, with an offline fallback shell
 
 ## Tech stack
@@ -43,7 +44,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Default passcode: `1234`.
+Open [http://localhost:3000](http://localhost:3000). Default login: `admin` / `1234` (the seeded admin). From the dashboard footer, click **Manage users** to add more accounts.
 
 ## Scripts
 

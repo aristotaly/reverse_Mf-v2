@@ -11,7 +11,10 @@ function runSeed(mode: "default" | "ewma" | "gap") {
   execSync(`npx tsx prisma/seed-test.ts ${mode}`, {
     cwd: process.cwd(),
     stdio: "inherit",
-    env: process.env,
+    env: {
+      ...process.env,
+      DATABASE_URL: process.env.DATABASE_URL ?? "file:./prisma/dev.db",
+    },
   });
 }
 

@@ -1,10 +1,18 @@
 import { cookies } from "next/headers";
 import crypto from "crypto";
+import { prisma } from "@/lib/prisma";
 
 const COOKIE_NAME = "session";
 
 type SessionPayload = {
   userId: string;
+};
+
+export type CurrentUser = {
+  id: string;
+  username: string;
+  name: string;
+  role: "admin" | "user";
 };
 
 function getSecret(): string {
@@ -51,4 +59,38 @@ export async function getSessionUserId(): Promise<string | null> {
 export async function clearSession(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_NAME);
+}
+
+/**
+ * Resolves the current logged-in user. Returns `null` if there is no session
+ * or the cookie's referenced user has been deleted.
+ */
+export async function getCurrentUser(): Promise<CurrentUser | null> {
+  const userId = await getSessionUserId();
+  if (!userId) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, username: true, name: true, role: true },
+  });
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    role: user.role === "admin" ? "admin" : "user",
+  };
+}
+
+export async function requireUser(): Promise<CurrentUser> {
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Unauthorized");
+  return user;
+}
+
+export async function requireAdmin(): Promise<CurrentUser> {
+  const user = await requireUser();
+  if (user.role !== "admin") throw new Error("Forbidden: admin only");
+  return user;
 }

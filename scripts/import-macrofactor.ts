@@ -97,8 +97,14 @@ async function ensureUser() {
 
   return prisma.user.upsert({
     where: { id: "seed-user" },
-    update: { name, username, passcodeHash: hash },
-    create: { id: "seed-user", name, username, passcodeHash: hash },
+    update: { name, username, passcodeHash: hash, role: "admin" },
+    create: {
+      id: "seed-user",
+      name,
+      username,
+      passcodeHash: hash,
+      role: "admin",
+    },
   });
 }
 

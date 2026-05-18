@@ -12,12 +12,14 @@ type WeightTrendShellProps = {
   allPoints: DailyPoint[];
   loggedEntries: { date: Date; weight: number }[];
   fixedDate?: Date;
+  currentUser?: { username: string; name: string; role: "admin" | "user" };
 };
 
 export function WeightTrendShell({
   allPoints,
   loggedEntries,
   fixedDate,
+  currentUser,
 }: WeightTrendShellProps) {
   const [showTutorial, setShowTutorial] = useState(false);
 
@@ -41,12 +43,28 @@ export function WeightTrendShell({
           onDismiss={() => setShowTutorial(false)}
         />
       )}
-      <nav className="flex justify-center gap-4 px-4 pb-6 text-sm">
+      <nav className="flex flex-wrap justify-center gap-4 px-4 pb-6 text-sm">
         <Link href="/scale-weight" className="text-violet-700 underline">
           Scale Weight
         </Link>
         <Link href="/weight-trend/logs" className="text-violet-700 underline">
           Trend Logs
+        </Link>
+        {currentUser?.role === "admin" && (
+          <Link
+            href="/admin"
+            className="text-violet-700 underline"
+            data-testid="admin-link"
+          >
+            Manage users
+          </Link>
+        )}
+        <Link
+          href="/logout"
+          className="text-neutral-500 underline"
+          data-testid="logout-link"
+        >
+          {currentUser ? `Sign out (${currentUser.username})` : "Sign out"}
         </Link>
       </nav>
     </div>

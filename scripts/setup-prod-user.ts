@@ -44,6 +44,26 @@ async function main() {
 
   console.log("Column + unique index OK.");
 
+  // 1b. Same dance for the `role` column (added in v2).
+  console.log("Ensuring 'role' column exists on User table...");
+  await prisma.$executeRawUnsafe(
+    'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "role" TEXT',
+  );
+  await prisma.$executeRawUnsafe(
+    `UPDATE "User" SET "role" = 'admin' WHERE "username" = $1 AND "role" IS NULL`,
+    TARGET_USERNAME.toLowerCase(),
+  );
+  await prisma.$executeRawUnsafe(
+    `UPDATE "User" SET "role" = 'user' WHERE "role" IS NULL`,
+  );
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "User" ALTER COLUMN "role" SET DEFAULT 'user'`,
+  );
+  await prisma.$executeRawUnsafe(
+    'ALTER TABLE "User" ALTER COLUMN "role" SET NOT NULL',
+  );
+  console.log("Role column OK.");
+
   // 2. Upsert the production credentials on the existing seed-user.
   const hash = await bcrypt.hash(TARGET_PASSWORD, 10);
   const updated = await prisma.user.upsert({
@@ -52,12 +72,14 @@ async function main() {
       username: TARGET_USERNAME.toLowerCase(),
       name: TARGET_NAME,
       passcodeHash: hash,
+      role: "admin",
     },
     create: {
       id: "seed-user",
       username: TARGET_USERNAME.toLowerCase(),
       name: TARGET_NAME,
       passcodeHash: hash,
+      role: "admin",
     },
   });
 
