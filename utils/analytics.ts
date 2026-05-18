@@ -157,9 +157,16 @@ export function computeKpis(
       ? windowPoints.reduce((sum, p) => sum + p.trend, 0) / windowPoints.length
       : 0;
 
+  // Compute the "Difference" from the *rounded* (display-precision) trend
+  // values at each endpoint, then re-round to clean up float artifacts.
+  // MacroFactor uses the rounded display values for this calc, so any sub-0.05
+  // residual at either endpoint gets quantized before the subtraction. Doing
+  // raw - raw then rounding yields off-by-0.1 numbers (e.g. 6M -3.7 vs -3.8).
   const firstTrend = windowPoints[0]?.trend ?? 0;
   const lastTrend = windowPoints[windowPoints.length - 1]?.trend ?? 0;
-  const difference = lastTrend - firstTrend;
+  const firstTrendRounded = Math.round(firstTrend * 10) / 10;
+  const lastTrendRounded = Math.round(lastTrend * 10) / 10;
+  const difference = lastTrendRounded - firstTrendRounded;
 
   return {
     average: Math.round(average * 10) / 10,

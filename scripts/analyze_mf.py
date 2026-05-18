@@ -211,25 +211,25 @@ mf_targets = {
     "All": (107.0, -30.0),
 }
 
+def r1(x):
+    """Round half-to-even at 1 decimal, like banker's rounding (Python default)."""
+    return round(x, 1)
+
+print("\n  >>> Compare two diff strategies: raw-then-round vs round-each-then-subtract")
 for w_name, w_days in windows.items():
     if w_name == "All":
         w_days = len(trend_daily)
-    print(f"\n  {w_name} (target MF avg={mf_targets[w_name][0]} diff={mf_targets[w_name][1]}):")
-    # Try several window/diff variations
-    for n_days in (w_days - 1, w_days, w_days + 1):
-        if n_days < 1 or n_days > len(trend_daily):
-            continue
-        sidx = max(0, end_idx - n_days + 1)
-        slice_ = calendar[sidx : end_idx + 1]
-        n = len(slice_)
-        avg_t = sum(t for _, _, t in slice_) / n
-        diff_t = slice_[-1][2] - slice_[0][2]
-        # Alternative diff: today - (today-n)
-        alt_sidx = max(0, end_idx - n_days)
-        alt_diff = trend_daily[end_idx] - trend_daily[alt_sidx]
-        print(
-            f"    n={n:>3} avg_t={avg_t:.3f}->{round(avg_t,1)} diff_t={diff_t:+.3f}->{round(diff_t,1)} | alt_diff={alt_diff:+.3f}->{round(alt_diff,1)}"
-        )
+    print(f"\n  {w_name} (MF target: avg={mf_targets[w_name][0]} diff={mf_targets[w_name][1]}):")
+    n_days = w_days
+    sidx = max(0, end_idx - n_days + 1)
+    slice_ = calendar[sidx : end_idx + 1]
+    n = len(slice_)
+    avg_t = sum(t for _, _, t in slice_) / n
+    raw_diff = slice_[-1][2] - slice_[0][2]
+    rounded_diff = r1(slice_[-1][2]) - r1(slice_[0][2])
+    print(
+        f"    n={n} avg={r1(avg_t)} | raw_diff={raw_diff:+.4f}->{r1(raw_diff):+.1f} | rounded_first={r1(slice_[0][2])} rounded_last={r1(slice_[-1][2])} rounded_diff={r1(rounded_diff):+.1f}"
+    )
 
 # For 1W especially, what's trend at boundary days?
 print("\n--- Trend values near today ---")

@@ -18,15 +18,17 @@ const PROD_PASSCODE = process.env.PROD_PASSCODE ?? "1234";
 type WindowId = "1W" | "1M" | "3M" | "6M" | "1Y" | "All";
 
 const MF_TARGETS: Record<WindowId, { avg: number; diff: number }> = {
-  "1W": { avg: 95.8, diff: -0.4 },
+  "1W": { avg: 95.8, diff: -0.5 },
   "1M": { avg: 96.0, diff: -0.7 },
   "3M": { avg: 96.5, diff: -1.2 },
-  "6M": { avg: 97.1, diff: -3.7 },
+  "6M": { avg: 97.1, diff: -3.8 },
   "1Y": { avg: 100.7, diff: -13.9 },
+  // MF UI shows -30.0; we're 0.1 kg off because MF seeds at 125.45 (pre-export
+  // historic data we don't have) vs our 125.40 first-scale seed.
   All: { avg: 107.0, diff: -29.9 },
 };
 
-const TOLERANCE_KG = 0.15;
+const TOLERANCE_KG = 0.05;
 
 function parseKpi(text: string): number {
   const m = /(-?\+?\d+(?:\.\d+)?)/.exec(text);
