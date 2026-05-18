@@ -56,3 +56,9 @@ scripts/macrofactor-calendar-aligned.csv
 *.tsbuildinfo
 next-env.d.ts
 
+
+.env.v1
+.env.v2
+.env.v2-db
+.env.local
+.env.production
